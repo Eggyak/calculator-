@@ -76,7 +76,11 @@ public class Main {
                 }
                 if (command.isEmpty()) continue;
                 try {
-                    if (command.equalsIgnoreCase("pi") || command.equalsIgnoreCase("e")) {
+                    if (isExpressionInput(command)) {
+                        double result = evaluateExpression(command);
+                        status = command + " = " + result;
+                        recent.add(status);
+                    } else if (command.equalsIgnoreCase("pi") || command.equalsIgnoreCase("e")) {
                         double value = command.equalsIgnoreCase("pi") ? Math.PI : Math.E;
                         status = command + " = " + value;
                         recent.add(status);
@@ -208,7 +212,9 @@ public class Main {
                 continue;
             }
             try {
-                if (command.equalsIgnoreCase("sin") || command.equalsIgnoreCase("cos")) {
+                if (isExpressionInput(command)) {
+                    System.out.println(command + " = " + evaluateExpression(command));
+                } else if (command.equalsIgnoreCase("sin") || command.equalsIgnoreCase("cos")) {
                     System.out.print("degrees> ");
                     if (!scanner.hasNextLine()) break;
                     double value = Double.parseDouble(scanner.nextLine().trim());
@@ -259,6 +265,152 @@ public class Main {
         System.out.println("  Scientific: sqrt  cbrt  square  reciprocal  log  ln  abs  exp  fact");
         System.out.println("  Constants:  pi  e");
         System.out.println("  Tools:      help  gui  exit");
+    }
+
+    private static boolean isExpressionInput(String input) {
+        return input.matches(".*[0-9().+*/%^].*")
+                || input.matches("(?i)(sqrt|cbrt|square|reciprocal|log|ln|abs|exp|fact|sin|cos|tan|asin|acos|atan)\\s*\\(.*");
+    }
+
+    private static double parseInput(String input) {
+        return isExpressionInput(input) ? evaluateExpression(input) : Double.parseDouble(input.trim());
+    }
+
+    private static double evaluateExpression(String input) {
+        ExpressionParser parser = new ExpressionParser(input);
+        return finite(parser.parse());
+    }
+
+    private static class ExpressionParser {
+        private final String input;
+        private int position;
+
+        ExpressionParser(String input) {
+            this.input = input;
+        }
+
+        double parse() {
+            double result = parseExpression();
+            skipSpaces();
+            if (position != input.length()) fail("Unexpected input");
+            return result;
+        }
+
+        private double parseExpression() {
+            double result = parseTerm();
+            while (true) {
+                skipSpaces();
+                if (match('+')) result += parseTerm();
+                else if (match('-')) result -= parseTerm();
+                else return result;
+            }
+        }
+
+        private double parseTerm() {
+            double result = parseUnary();
+            while (true) {
+                skipSpaces();
+                if (match('*')) result *= parseUnary();
+                else if (match('/')) result /= parseUnary();
+                else if (match('%')) result %= parseUnary();
+                else if (startsImplicitFactor()) result *= parseUnary();
+                else return result;
+            }
+        }
+
+        private double parsePower() {
+            double result = parsePrimary();
+            skipSpaces();
+            return match('^') ? Math.pow(result, parseUnary()) : result;
+        }
+
+        private double parseUnary() {
+            skipSpaces();
+            if (match('+')) return parseUnary();
+            if (match('-')) return -parseUnary();
+            return parsePower();
+        }
+
+        private double parsePrimary() {
+            skipSpaces();
+            if (match('(')) {
+                double result = parseExpression();
+                expect(')');
+                return result;
+            }
+            if (position < input.length()
+                    && (Character.isDigit(input.charAt(position)) || input.charAt(position) == '.')) {
+                return parseNumber();
+            }
+            String name = parseName();
+            if (name.equalsIgnoreCase("pi")) return Math.PI;
+            if (name.equalsIgnoreCase("e")) return Math.E;
+            expect('(');
+            double result = unary(name, parseExpression());
+            expect(')');
+            return result;
+        }
+
+        private double parseNumber() {
+            int start = position;
+            while (position < input.length()
+                    && (Character.isDigit(input.charAt(position)) || input.charAt(position) == '.')) {
+                position++;
+            }
+            if (position < input.length() && (input.charAt(position) == 'e'
+                    || input.charAt(position) == 'E')) {
+                position++;
+                if (position < input.length()
+                        && (input.charAt(position) == '+' || input.charAt(position) == '-')) {
+                    position++;
+                }
+                while (position < input.length() && Character.isDigit(input.charAt(position))) {
+                    position++;
+                }
+            }
+            try {
+                return Double.parseDouble(input.substring(start, position));
+            } catch (NumberFormatException exception) {
+                fail("Invalid number");
+                return 0;
+            }
+        }
+
+        private String parseName() {
+            skipSpaces();
+            int start = position;
+            while (position < input.length() && Character.isLetter(input.charAt(position))) position++;
+            if (start == position) fail("Expected a number or function");
+            return input.substring(start, position);
+        }
+
+        private boolean match(char expected) {
+            skipSpaces();
+            if (position < input.length() && input.charAt(position) == expected) {
+                position++;
+                return true;
+            }
+            return false;
+        }
+
+        private void expect(char expected) {
+            if (!match(expected)) fail("Expected '" + expected + "'");
+        }
+
+        private void skipSpaces() {
+            while (position < input.length() && Character.isWhitespace(input.charAt(position))) position++;
+        }
+
+        private boolean startsImplicitFactor() {
+            skipSpaces();
+            if (position >= input.length()) return false;
+            char next = input.charAt(position);
+            return next == '(' || next == '.' || Character.isDigit(next) || Character.isLetter(next);
+        }
+
+        private void fail(String message) {
+            throw new IllegalArgumentException(message + " at position " + position);
+        }
     }
 
         private void showWindow() {
@@ -402,7 +554,7 @@ public class Main {
         private void chooseOperator(String operator) {
             try {
                 if (firstOperand != null && !waitingForOperand) calculateResult();
-                firstOperand = Double.parseDouble(display.getText());
+                firstOperand = parseInput(display.getText());
                 pendingOperator = operator;
                 waitingForOperand = true;
             } catch (NumberFormatException exception) {
@@ -413,7 +565,7 @@ public class Main {
         private void calculateResult() {
             if (firstOperand == null || pendingOperator == null) return;
             try {
-                double secondOperand = Double.parseDouble(display.getText());
+                double secondOperand = parseInput(display.getText());
                 double result;
                 switch (pendingOperator) {
                     case "+": result = Addition.add(firstOperand, secondOperand); break;
@@ -435,7 +587,7 @@ public class Main {
 
         private void calculateUnary(String operator) {
             try {
-                double input = Double.parseDouble(display.getText());
+                double input = parseInput(display.getText());
                     double result = finite(unary(operator, input));
                 record(operator + "(" + input + ") = " + result);
                 display.setText(format(result));
@@ -499,7 +651,7 @@ public class Main {
                 if (firstOperand != null && pendingOperator != null) {
                     calculateResult();
                 } else {
-                    display.setText(format(Double.parseDouble(display.getText())));
+                    display.setText(format(parseInput(display.getText())));
                     waitingForOperand = true;
                 }
             } catch (NumberFormatException exception) {
