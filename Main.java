@@ -59,7 +59,7 @@ public class Main {
     private static void runInteractiveCli() {
         List<String> recent = new ArrayList<>();
         List<String> inputHistory = new ArrayList<>();
-        String status = "Ready. Type help for commands.";
+        String status = "Choose an operation, then enter its value(s).";
         try {
             setRawMode(true);
             while (true) {
@@ -71,7 +71,7 @@ public class Main {
                     return;
                 }
                 if (command.equalsIgnoreCase("help")) {
-                    status = "+ - * / % ^ | sin cos tan | sqrt cbrt square reciprocal | log ln abs exp fact | pi e | gui exit";
+                    status = "Unary operations take one value; binary operations take two.";
                     continue;
                 }
                 if (command.isEmpty()) continue;
@@ -164,6 +164,10 @@ public class Main {
             List<String> recent, String status) {
         StringBuilder output = new StringBuilder("\033[H\033[2J");
         output.append("\033[1;36m  calc\033[0m  ").append(status).append("\n\n");
+        output.append("  \033[2mnumber\033[0m  +  -  *  /  %  ^\n");
+        output.append("  \033[2mtrig\033[0m    sin  cos  tan  asin  acos  atan\n");
+        output.append("  \033[2mmath\033[0m    sqrt  cbrt  square  reciprocal  log  ln  abs  exp  fact\n");
+        output.append("  \033[2mtools\033[0m   pi  e  help  gui  exit\n\n");
         int start = Math.max(0, recent.size() - 4);
         for (int index = start; index < recent.size(); index++) {
             output.append("  \033[36m›\033[0m ").append(recent.get(index)).append("\n");
@@ -189,7 +193,7 @@ public class Main {
     private static void runLineCli() {
         Scanner scanner = new Scanner(System.in);
         System.out.println("calc / cli");
-        System.out.println("Type gui to open the desktop interface, or exit to quit.");
+        printCliGuide();
         while (true) {
             System.out.print("\ncalc> ");
             if (!scanner.hasNextLine()) break;
@@ -238,7 +242,7 @@ public class Main {
                     }
                     System.out.println(first + " " + binaryOperator + " " + second + " = " + finite(result));
                 } else {
-                    System.out.println("Commands: + - * / % ^ sin cos tan sqrt log ln abs exp fact pi e gui exit");
+                    printCliGuide();
                 }
             } catch (IllegalArgumentException exception) {
                 System.out.println(exception.getMessage() == null
@@ -246,6 +250,15 @@ public class Main {
             }
         }
         scanner.close();
+    }
+
+    private static void printCliGuide() {
+        System.out.println("\nOperations");
+        System.out.println("  Binary:     +  -  *  /  %  ^     (two numbers)");
+        System.out.println("  Trig:       sin  cos  tan  asin  acos  atan  (degrees)");
+        System.out.println("  Scientific: sqrt  cbrt  square  reciprocal  log  ln  abs  exp  fact");
+        System.out.println("  Constants:  pi  e");
+        System.out.println("  Tools:      help  gui  exit");
     }
 
         private void showWindow() {
